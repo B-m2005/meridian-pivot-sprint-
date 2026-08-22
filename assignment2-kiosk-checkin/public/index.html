@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solstice Events Co. — Kiosk Check-In (Async Model)</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f8; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 560px; margin: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .attendee { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .NOT_CHECKED_IN { background: #f3f4f6; color: #6b7280; }
+        .PENDING { background: #fef3c7; color: #92400e; }
+        .CHECKED_IN { background: #d1fae5; color: #065f46; }
+        button { background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        .log { background: #0f172a; color: #38bdf8; padding: 10px; font-family: monospace; border-radius: 4px; margin-top: 15px; min-height: 100px; white-space: pre-wrap; font-size: 0.85rem; }
+        .reset { background: #6b7280; margin-top: 10px; }
+        .note { color: #6b7280; font-size: 0.85rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Solstice Events Co. — Kiosk Check-In</h2>
+        <p class="note">Async model: scan queues a print job and returns immediately as PENDING. Status flips to CHECKED_IN only once the vendor's webhook confirms — which arrives after a random delay, so completions may land out of order.</p>
+        <div id="attendees"></div>
+        <button class="reset" onclick="resetAll()">Reset Demo</button>
+        <div id="output" class="log">Ready. Scan an attendee to begin.</div>
+    </div>
+
+    <script>
+        async function scan(attendeeId) {
+            const output = document.getElementById('output');
+            const res = await fetch('/api/kiosk/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attendeeId })
+            });
+            const data = await res.json();
+            output.innerText = `[SCAN ${attendeeId}] HTTP ${res.status}\n${JSON.stringify(data, null, 2)}`;
+            refresh();
+        }
+
+        async function resetAll() {
+            await fetch('/api/kiosk/reset', { method: 'POST' });
+            document.getElementById('output').innerText = 'Demo reset.';
+            refresh();
+        }
+
+        async function refresh() {
+            const res = await fetch('/api/kiosk/attendees');
+            const data = await res.json();
+            const container = document.getElementById('attendees');
+            container.innerHTML = data.attendees.map(a => `
+                <div class="attendee">
+                    <div>
+                        <strong>${a.id}</strong>
+                        <span class="badge ${a.status}">${a.status.replace(/_/g, ' ')}</span>
+                    </div>
+                    <button onclick="scan('${a.id}')">Scan QR</button>
+                </div>
+            `).join('') + `<p class="note">Vendor queue depth: ${data.queueDepth}</p>`;
+        }
+
+        setInterval(refresh, 700);
+        refresh();
+    </script>
+</body>
+</html>
