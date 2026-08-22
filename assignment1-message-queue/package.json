@@ -1,0 +1,8 @@
+{
+  "name": "northstar-message-queue",
+  "version": "1.0.0",
+  "description": "Day 1-2 Solo Recon: in-memory message queue with async background worker",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.19.2" }
+}
