@@ -1,0 +1,32 @@
+// verifySignature.js
+// Same tested module from the webhook-verification prototype — reused
+// here because the pivot's webhook callback needs the same protection:
+// the vendor's "print complete" callback must be authenticated so a
+// spoofed request can't falsely mark an attendee as checked in.
+const crypto = require("crypto");
+
+function verifySignature(rawBody, signature, secret) {
+  if (!signature) return false;
+
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  const sigBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expectedSignature, "hex");
+
+  // Length check before timingSafeEqual — see webhook-verification
+  // prototype's Blocker 4 for why this matters.
+  if (sigBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+}
+
+function signPayload(rawBody, secret) {
+  return crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+}
+
+module.exports = { verifySignature, signPayload };
