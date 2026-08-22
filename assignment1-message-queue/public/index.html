@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Northstar - Message Queue Prototype</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f8; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; margin-right: 5px; margin-bottom: 5px; }
+        .log { background: #0f172a; color: #38bdf8; padding: 10px; font-family: monospace; border-radius: 4px; margin-top: 15px; min-height: 100px; white-space: pre-wrap; }
+        .status { color: #6b7280; font-size: 0.85rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Message Queue Architecture</h2>
+        <p>Decoupling Producer from Consumer for Inventory Sync</p>
+        <button onclick="produceMessage()">Produce Message (Add to Queue)</button>
+        <button onclick="consumeMessage()" style="background:#16a34a;">Consume Manually (optional)</button>
+        <div id="output" class="log">Queue initialized. A background worker is auto-consuming every few seconds — try producing a few messages and watch the queue drain on its own, without clicking consume.</div>
+        <div id="status" class="status">Queue depth: checking...</div>
+    </div>
+
+    <script>
+        async function produceMessage() {
+            const output = document.getElementById('output');
+            try {
+                const res = await fetch('/api/queue/produce', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId: 'ITEM-101', action: 'UPDATE_STOCK', qty: 50 })
+                });
+                const data = await res.json();
+                if (res.status === 400) {
+                    output.innerText = `[REJECTED]\n${data.message}`;
+                } else {
+                    output.innerText = `[PRODUCED]\nMessage ID: ${data.messageId}\nQueue Depth: ${data.queueLength}\n\n(Watch "Queue depth" below — the background worker will drain this without any button click.)`;
+                }
+            } catch (err) {
+                output.innerText = "Error producing message.";
+            }
+        }
+
+        async function consumeMessage() {
+            const output = document.getElementById('output');
+            try {
+                const res = await fetch('/api/queue/consume', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'empty') {
+                    output.innerText = "[MANUAL CONSUME]\nQueue is empty. No messages to process.";
+                } else {
+                    output.innerText = `[MANUAL CONSUME]\nProcessed: ${data.processedMessage.id}\nRemaining in Queue: ${data.remainingInQueue}`;
+                }
+            } catch (err) {
+                output.innerText = "Error consuming message.";
+            }
+        }
+
+        // Poll queue status so you can visibly see the background
+        // worker draining messages without any manual action.
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/queue/status');
+                const data = await res.json();
+                document.getElementById('status').innerText =
+                    `Queue depth: ${data.queueLength} | Total processed by worker: ${data.processedCount}`;
+            } catch (err) {
+                document.getElementById('status').innerText = 'Queue depth: unable to fetch status';
+            }
+        }
+        setInterval(pollStatus, 1000);
+        pollStatus();
+    </script>
+</body>
+</html>
